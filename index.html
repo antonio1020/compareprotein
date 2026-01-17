@@ -148,7 +148,7 @@
     const product = products.find(p => p.id === id);
     product[field] = value;
     saveProducts();
-    render();
+    updateMetrics(id);
   }
 
   function calculate(product) {
@@ -172,6 +172,22 @@
       proteinPerDKK: totalProtein / priceDKK,
       proteinPerEUR: totalProtein / priceEUR
     };
+  }
+
+  function updateMetrics(id) {
+    const product = products.find(p => p.id === id);
+    const calc = calculate(product);
+
+    const dkkEl = document.getElementById(`dkk-${id}`);
+    const eurEl = document.getElementById(`eur-${id}`);
+
+    if (dkkEl) {
+      dkkEl.innerHTML = `Protein / 1 DKK<br>${round(calc.proteinPerDKK)}`;
+    }
+
+    if (eurEl) {
+      eurEl.innerHTML = `Protein / 1 EUR<br>${round(calc.proteinPerEUR)}`;
+    }
   }
 
   function getSortedProducts() {
@@ -237,12 +253,12 @@
                  oninput="updateProduct('${product.id}', 'proteinPer100', this.value)">
         </div>
 
-        <div class="metric">
+        <div class="metric" id="dkk-${product.id}">
           Protein / 1 DKK<br>
           ${round(calc.proteinPerDKK)}
         </div>
 
-        <div class="metric">
+        <div class="metric" id="eur-${product.id}">
           Protein / 1 EUR<br>
           ${round(calc.proteinPerEUR)}
         </div>
