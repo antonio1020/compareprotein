@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Protein Powder Comparison</title>
+<style>
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #f6f7f8;
+    margin: 0;
+    padding: 24px;
+  }
+
+  h1 {
+    margin-bottom: 12px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  button {
+    padding: 10px 14px;
+    border: none;
+    border-radius: 6px;
+    background: #2563eb;
+    color: white;
+    cursor: pointer;
+    font-weight: 600;
+  }
+
+  button.delete {
+    background: #dc2626;
+  }
+
+  select {
+    padding: 8px;
+  }
+
+  .products {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .card {
+    background: white;
+    padding: 16px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .card strong {
+    grid-column: span 2;
+    font-size: 18px;
+  }
+
+  label {
+    font-size: 12px;
+    color: #555;
+  }
+
+  input, textarea {
+    width: 100%;
+    padding: 8px;
+    margin-top: 4px;
+    box-sizing: border-box;
+  }
+
+  textarea {
+    resize: vertical;
+  }
+
+  .full {
+    grid-column: span 2;
+  }
+
+  .metric {
+    background: #f1f5f9;
+    padding: 10px;
+    border-radius: 6px;
+    font-weight: 600;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<h1>Protein Powder Comparison</h1>
+
+<div class="controls">
+  <button id="addProduct">Add product</button>
+
+  <select id="sortMode">
+    <option value="created">Added order</option>
+    <option value="best">Best value (protein / DKK)</option>
+  </select>
+</div>
+
+<div class="products" id="products"></div>
+
+<script>
+  const EXCHANGE_RATE = 7.47;
+  const STORAGE_KEY = "proteinProducts";
+
+  let products = loadProducts();
+
+  function loadProducts() {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+  }
+
+  function saveProducts() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+  }
+
+  function round(value) {
+    return isNaN(value) ? "" : value.toFixed(2);
+  }
+
+  function addProduct() {
+    products.push({
+      id: crypto.randomUUID(),
+      createdAt: Date.now(),
+      name: "",
+      price: "",
+      currency: "DKK",
+      size: "",
+      proteinPer100: "",
+      notes: ""
+    });
+    saveProducts();
+    render();
+  }
+
+  function deleteProduct(id) {
+    products = products.filter(p => p.id !== id);
+    saveProducts();
+    render();
+  }
+
+  function updateProduct(id, field, value) {
+    const product = products.find(p => p.id === id);
+    product[field] = value;
+    saveProducts();
+    render();
+  }
+
+  function calculate(product) {
+    const price = parseFloat(product.price);
+    const size = parseFloat(product.size);
+    const proteinPer100 = parseFloat(product.proteinPer100);
+
+    if (!price || !size || !proteinPer100) return {};
+
+    const priceDKK = product.currency === "DKK"
+      ? price
+      : price * EXCHANGE_RATE;
+
+    const priceEUR = product.currency === "EUR"
+      ? price
+      : price / EXCHANGE_RATE;
+
+    const totalProtein = size * (proteinPer100 / 100);
+
+    return {
+      proteinPerDKK: totalProtein / priceDKK,
+      proteinPerEUR: totalProtein / priceEUR
+    };
+  }
+
+  function getSortedProducts() {
+    const mode = document.getElementById("sortMode").value;
+    const copy = [...products];
+
+    if (mode === "best") {
+      copy.sort((a, b) => {
+        const aVal = calculate(a).proteinPerDKK || 0;
+        const bVal = calculate(b).proteinPerDKK || 0;
+        return bVal - aVal;
+      });
+    } else {
+      copy.sort((a, b) => a.createdAt - b.createdAt);
+    }
+
+    return copy;
+  }
+
+  function render() {
+    const container = document.getElementById("products");
+    container.innerHTML = "";
+
+    getSortedProducts().forEach(product => {
+      const calc = calculate(product);
+
+      const card = document.createElement("div");
+      card.className = "card";
+
+      card.innerHTML = `
+        <strong>
+          <input placeholder="Product name"
+                 value="${product.name}"
+                 oninput="updateProduct('${product.id}', 'name', this.value)">
+        </strong>
+
+        <div>
+          <label>Price</label>
+          <input type="number" step="any"
+                 value="${product.price}"
+                 oninput="updateProduct('${product.id}', 'price', this.value)">
+        </div>
+
+        <div>
+          <label>Currency</label>
+          <select onchange="updateProduct('${product.id}', 'currency', this.value)">
+            <option value="DKK" ${product.currency === "DKK" ? "selected" : ""}>DKK</option>
+            <option value="EUR" ${product.currency === "EUR" ? "selected" : ""}>EUR</option>
+          </select>
+        </div>
+
+        <div>
+          <label>Size (g)</label>
+          <input type="number" step="any"
+                 value="${product.size}"
+                 oninput="updateProduct('${product.id}', 'size', this.value)">
+        </div>
+
+        <div>
+          <label>Protein per 100g</label>
+          <input type="number" step="any"
+                 value="${product.proteinPer100}"
+                 oninput="updateProduct('${product.id}', 'proteinPer100', this.value)">
+        </div>
+
+        <div class="metric">
+          Protein / 1 DKK<br>
+          ${round(calc.proteinPerDKK)}
+        </div>
+
+        <div class="metric">
+          Protein / 1 EUR<br>
+          ${round(calc.proteinPerEUR)}
+        </div>
+
+        <div class="full">
+          <label>Notes</label>
+          <textarea rows="2"
+            oninput="updateProduct('${product.id}', 'notes', this.value)">${product.notes}</textarea>
+        </div>
+
+        <div class="full">
+          <button class="delete" onclick="deleteProduct('${product.id}')">Delete</button>
+        </div>
+      `;
+
+      container.appendChild(card);
+    });
+  }
+
+  document.getElementById("addProduct").addEventListener("click", addProduct);
+  document.getElementById("sortMode").addEventListener("change", render);
+
+  render();
+</script>
+
+</body>
+</html>
